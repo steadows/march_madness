@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Conda / Virtualenv
+.conda/
+.venv/
+env/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_metadata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project artifacts (large/generated — rebuild from code)
+artifacts/*.csv
+artifacts/*.json
+artifacts/*.pkl
+artifacts/*.joblib
+artifacts/*.png
+artifacts/*.txt
+submissions/*.csv
+
+# Data (tracked separately or downloaded from Kaggle)
+data/
+
+# Logs
+*.log
+
+# Keep artifact and submission directories (but not contents)
+!artifacts/.gitkeep
+!submissions/.gitkeep
