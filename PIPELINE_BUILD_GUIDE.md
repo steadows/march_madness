@@ -499,6 +499,161 @@ generate_submission(predict_fn=my_predict, stage=2, output_path='submissions/my_
 
 ---
 
+---
+
+## Phase 4: Ensemble Pipeline
+
+**Session budget: ~35 tool calls**
+**Load skill:** `bash skills.sh ensemble-submission`
+
+> **Goal: build a proper multi-model ensemble that beats the XGBoost-only baseline. Target: M Brier < 0.200 in CV.**
+
+### Context: What Exists Already
+Before writing any code, read these files to understand what's already built:
+- `src/models.py` — `train_logistic_baseline()`, `train_xgboost()`, `run_cv_baseline()` already exist
+- `src/cv.py` — `expanding_window_cv()`, `evaluate_brier()`, `cv_evaluate()` already exist
+- `src/calibration.py` — `clip_predictions()`, `calibrate_platt()`, `reliability_diagram()` already exist
+- `src/submission.py` — `generate_submission()`, `make_predict_fn()` already exist
+- `artifacts/features_men.csv` — 2585×42 training matrix, ready to use
+- `artifacts/features_women.csv` — 1717×42 training matrix, ready to use
+- `submissions/baseline_v1.csv` — Stage 1 baseline submission already generated
+
+**DO NOT rewrite existing code. Add to it.**
+
+### Baseline Scores to Beat (from Phase 3 CV, 5 folds 2020-2024)
+| Model | M Brier | W Brier |
+|-------|---------|---------|
+| Logistic (seed_diff only) | 0.213 | 0.153 |
+| XGBoost (all features) | 0.212 | 0.157 |
+
+---
+
+### GSD Checklist — Model Wrappers
+
+Add these functions to `src/models.py` (do NOT create a new file):
+
+- [ ] `train_lightgbm(X_train, y_train, X_val=None, y_val=None, params=None) -> model`
+  - Default params: `objective='binary'`, `metric='binary_logloss'`, `max_depth=6`, `learning_rate=0.05`, `subsample=0.8`, `colsample_bytree=0.8`, `min_child_samples=20`, `reg_alpha=0.1`, `reg_lambda=1.0`, `n_estimators=500`, `verbose=-1`
+  - Early stopping on val set if provided (`callbacks=[lgb.early_stopping(50), lgb.log_evaluation(-1)]`)
+  - Returns fitted LGBMClassifier with `.predict_proba()` interface
+
+- [ ] `train_catboost(X_train, y_train, X_val=None, y_val=None, params=None) -> model`
+  - Default params: `iterations=500`, `depth=6`, `learning_rate=0.05`, `l2_leaf_reg=3.0`, `eval_metric='Logloss'`, `verbose=0`, `random_state=42`
+  - Early stopping on val set if provided
+  - Returns fitted CatBoostClassifier
+
+- [ ] `train_ridge(X_train, y_train) -> Pipeline`
+  - `StandardScaler + Ridge(alpha=1.0)` wrapped in sklearn Pipeline
+  - Use `predict_proba` via sigmoid transform: `1 / (1 + np.exp(-model.decision_function(X)))`
+  - Actually: use `LogisticRegression(C=0.1, penalty='l2')` — same effect, native predict_proba
+  - Returns Pipeline with `.predict_proba()` interface
+
+- [ ] Verify: all three new wrappers produce probabilities in (0, 1)
+- [ ] Verify: all three accept NaN features (XGBoost/LGB/CatBoost handle natively; Ridge needs `.fillna(median)` first)
+
+---
+
+### GSD Checklist — Ensemble Module
+
+Create `src/ensemble.py`:
+
+- [ ] `run_all_models_cv(df, feature_cols, target_col='target', gender='M') -> dict`
+  - Runs ALL 5 models through `expanding_window_cv(df, min_train_end=2019)`
+  - Models: logistic (seed_diff only), ridge (all features), XGBoost, LightGBM, CatBoost
+  - For each fold: trains all 5 models, collects predictions on val set
+  - Returns dict: `{model_name: {'fold_briers': [...], 'mean_brier': float, 'oof_preds': array}}`
+  - Also stores out-of-fold (OOF) predictions for stacking
+  - Logs per-fold Brier for each model
+
+- [ ] `simple_average_ensemble(oof_preds_dict) -> np.ndarray`
+  - Takes dict of `{model_name: oof_pred_array}`, returns simple mean
+  - Evaluate: `evaluate_brier(y_true, simple_avg)` — should beat best single model
+
+- [ ] `optimize_ensemble_weights(oof_preds_dict, y_true) -> dict`
+  - Uses `scipy.optimize.minimize` to find weights that minimize Brier on OOF predictions
+  - Constraint: weights sum to 1.0, all weights >= 0
+  - Returns `{model_name: weight}`
+  - Log the optimal weights — they reveal which models are most valuable
+
+- [ ] `weighted_ensemble(oof_preds_dict, weights) -> np.ndarray`
+  - Applies given weights and returns weighted average prediction
+
+- [ ] Run full ensemble CV for BOTH M and W
+- [ ] Log all results to `artifacts/ensemble_results.txt`
+- [ ] **Simple average ensemble Brier < 0.210 for M** (must beat single XGBoost)
+- [ ] **Weighted ensemble Brier < 0.205 for M** (target, not mandatory to proceed)
+
+---
+
+### GSD Checklist — Recency Weighting
+
+- [ ] Add `compute_sample_weights(seasons: list[int]) -> np.ndarray` to `src/ensemble.py`
+  - Linear decay: most recent season weight=1.0, oldest=0.3
+  - `weights = np.linspace(0.3, 1.0, len(seasons))` mapped per row
+- [ ] Re-run XGBoost CV with sample weights — log whether it improves Brier
+- [ ] If improved: add `sample_weight` param to `train_xgboost()` and `train_lightgbm()`
+
+---
+
+### GSD Checklist — Tests
+
+Create `tests/test_ensemble.py`:
+
+- [ ] Test: `train_lightgbm` returns model with `.predict_proba()` that outputs (N, 2) array
+- [ ] Test: `train_catboost` same
+- [ ] Test: `train_ridge` (logistic L2) same
+- [ ] Test: all three models' predictions are in (0, 1)
+- [ ] Test: `simple_average_ensemble` output shape matches input
+- [ ] Test: `optimize_ensemble_weights` weights sum to 1.0 (within 1e-6)
+- [ ] Test: weighted ensemble Brier <= best single model Brier on same OOF data
+- [ ] Test: `compute_sample_weights` — most recent season has highest weight
+- [ ] `pytest tests/test_ensemble.py -q` — ALL PASS
+- [ ] `pytest tests/ -q` — ALL existing tests still pass
+
+---
+
+### GSD Checklist — Final Submission
+
+- [ ] Train final ensemble on ALL available data (no held-out val — use all seasons):
+  - M: train on 2003-2025, W: train on 2010-2025
+  - Use optimal weights from OOF optimization
+- [ ] Generate Stage 1 submission: `submissions/ensemble_v1.csv`
+- [ ] Verify `ensemble_v1.csv`: 519,144 rows, no NaN, Pred in [0.05, 0.95], std > 0.05
+- [ ] Generate Stage 2 submission: `submissions/ensemble_2026.csv`
+  - This is the real competition submission (2026 season)
+- [ ] Save `artifacts/ensemble_weights.json` — the optimal weights per model per gender
+- [ ] Save `artifacts/ensemble_results.txt` — all CV Brier scores
+
+---
+
+### GSD Checklist — Phase Wrap
+
+- [ ] `pytest tests/ -q` — ALL tests pass
+- [ ] `artifacts/ensemble_results.txt` documents all model Brier scores
+- [ ] `submissions/ensemble_v1.csv` exists and is valid (519,144 rows)
+- [ ] `submissions/ensemble_2026.csv` exists and is valid (132,133 rows)
+- [ ] `git add -A && git commit -m "phase 4: ensemble pipeline complete"`
+- [ ] Update `CLAUDE.md`:
+  - Mark Phase 4 complete
+  - Log ensemble Brier scores in score table
+  - Log optimal ensemble weights in Key Decisions
+
+---
+
+### Expected File Changes Summary
+
+```
+src/models.py          — ADD: train_lightgbm(), train_catboost(), train_ridge()
+src/ensemble.py        — CREATE NEW: run_all_models_cv(), simple/weighted ensemble, weight optimizer
+tests/test_ensemble.py — CREATE NEW: tests for all new model wrappers + ensemble logic
+artifacts/ensemble_results.txt   — NEW: all CV scores
+artifacts/ensemble_weights.json  — NEW: optimal model weights
+submissions/ensemble_v1.csv      — NEW: Stage 1 ensemble submission
+submissions/ensemble_2026.csv    — NEW: Stage 2 (2026) ensemble submission
+```
+
+---
+
 ## Escalation Protocol
 
 ### 🔴 STOP — Escalate Immediately

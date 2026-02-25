@@ -79,7 +79,7 @@ Two types of skills:
 | 1: Data | `data-engineering` | `c/data-quality-frameworks` or `c/python-testing-patterns` |
 | 2: Features | `data-engineering` | `c/python-performance-optimization` or `c/python-type-safety` |
 | 3: Training | `model-training` or `evaluation-validation` | `c/test-driven-development` |
-| 4: Ensemble | `ensemble-submission` | — |
+| **4: Ensemble** | **`ensemble-submission`** | **—** |
 | 5: Iteration | `hyperparameter-tuning` or `external-data` | — |
 | Debugging | `debugging` | `c/python-error-handling` |
 | Commits | — | `c/git-commit` |
@@ -93,10 +93,13 @@ Two types of skills:
 - [x] Phase 1: Data Loading & EDA
 - [x] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
 - [x] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
-- [ ] Phase 4: Ensemble & Submission Generation
+- [ ] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Pipeline complete — ready for Phase 4 (Ensemble & Submission)
+### 🔵 Current Phase: Phase 4 — Ensemble Pipeline (NOT STARTED)
+<!-- Next agent: read Phase 4 section in PIPELINE_BUILD_GUIDE.md. Load skill: bash skills.sh ensemble-submission -->
+<!-- DO NOT rewrite existing src/models.py, src/cv.py, src/submission.py — ADD to them -->
+<!-- Baseline to beat: M Brier 0.212 (XGBoost), target < 0.205 with weighted ensemble -->
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -109,8 +112,8 @@ Two types of skills:
 | XGBoost | 0.212 | 0.157 | 5 folds (2020-2024) | All 38 features |
 | LightGBM | — | — | — | |
 | CatBoost | — | — | — | |
-| Simple Avg Ensemble | — | — | — | |
-| Weighted Ensemble | — | — | — | **BEST** |
+| Simple Avg Ensemble | — | — | — | Target: M < 0.210 |
+| Weighted Ensemble | — | — | — | Target: M < 0.205 — **BEST** |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
