@@ -91,12 +91,12 @@ Two types of skills:
 ### Phase Progress
 - [x] Phase 0: Environment Setup
 - [x] Phase 1: Data Loading & EDA
-- [ ] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
+- [x] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
 - [ ] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
 - [ ] Phase 4: Ensemble & Submission Generation
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 2 — Feature Engineering (NOT STARTED)
+### 🔵 Current Phase: Phase 3 — CV Framework & Baseline Models (NOT STARTED)
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -118,6 +118,9 @@ Two types of skills:
 - DECISION: WTeams.csv has only TeamID+TeamName (no FirstD1Season/LastD1Season) — W teams load differently than M
 - DECISION: Seed 16 win rate ~25.8% in tournament is correct — inflated by First Four 16v16 play-in games
 - DATA: Massey has 196 systems (not "60+" as docs say), top systems by coverage: AP, DOL, USA, WLK, POM, MOR, COL (all 24 seasons)
+- DECISION: seed_num_diff ranks low in XGBoost importance (rank 38) despite -0.48 correlation with target — expected collinearity artifact (POM/MOR/ELO all encode quality). Feature is correct, not a bug.
+- DECISION: coach_tourney_exp_diff is M-only; always 0 for W data (coaches file is M only). OK for GBMs, excluded from W variance checks.
+- DECISION: Training on all seasons (including pre-2003 M, pre-2010 W) gives 31-41% NaN but modern-only (2003+/2010+) is 3.3% NaN. GBMs handle NaN natively.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
@@ -125,6 +128,16 @@ Two types of skills:
 
 ### 📋 Feature Columns
 <!-- After Phase 2, list ALL final feature column names here. Phase 3 reads this list instead of re-deriving. -->
+38 differential features (all end in `_diff`), see `artifacts/feature_columns.json` for full list.
+Key features: `win_pct`, `pts_per_game`, `pts_allowed_per_game`, `off_eff`, `def_eff`, `net_eff`,
+`efg_pct`, `to_rate`, `or_pct`, `ft_rate`, `fg3_rate`, `ast_to_ratio`, `stl_per_game`, `blk_per_game`,
+`recent_win_pct`, `recent_off_eff`, `recent_def_eff`, `recent_net_eff`, `recent_efg_pct`,
+`recent_to_rate`, `recent_or_pct`, `recent_ft_rate`, `recent_fg3_rate`,
+`recent_pts_per_game`, `recent_pts_allowed_per_game`,
+`elo`, `pom_rank`, `sag_rank`, `mor_rank`, `wol_rank`, `dol_rank`, `col_rank`, `rpi_rank`, `ap_rank`, `usa_rank`,
+`seed_num`, `sos_elo`, `coach_tourney_exp`
+Feature matrix files: `artifacts/features_men.csv` (2585×42), `artifacts/features_women.csv` (1717×42)
+To get feature cols: `[c for c in df.columns if c.endswith('_diff')]`
 
 ---
 
