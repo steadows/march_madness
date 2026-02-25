@@ -47,3 +47,4 @@ data/
 # Keep artifact and submission directories (but not contents)
 !artifacts/.gitkeep
 !submissions/.gitkeep
+catboost_info/

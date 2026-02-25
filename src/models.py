@@ -1,10 +1,12 @@
-"""Baseline model training. Human extends this for full experimentation."""
+"""Model training wrappers for NCAA tournament prediction."""
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
+import lightgbm as lgb
+from catboost import CatBoostClassifier
 
 
 def train_logistic_baseline(
@@ -84,6 +86,117 @@ def train_xgboost(
         model.fit(X_train, y_train)
 
     return model
+
+
+def train_lightgbm(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_val: np.ndarray | None = None,
+    y_val: np.ndarray | None = None,
+    params: dict | None = None,
+) -> lgb.LGBMClassifier:
+    """Train LightGBM classifier with optional early stopping.
+
+    Returns fitted LGBMClassifier with .predict_proba() interface.
+    """
+    default_params = {
+        'objective': 'binary',
+        'metric': 'binary_logloss',
+        'max_depth': 6,
+        'learning_rate': 0.05,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'min_child_samples': 20,
+        'reg_alpha': 0.1,
+        'reg_lambda': 1.0,
+        'n_estimators': 500,
+        'verbose': -1,
+        'random_state': 42,
+    }
+    if params:
+        default_params.update(params)
+
+    model = lgb.LGBMClassifier(**default_params)
+
+    use_early_stopping = X_val is not None and y_val is not None
+    if use_early_stopping:
+        model.fit(
+            X_train, y_train,
+            eval_set=[(X_val, y_val)],
+            callbacks=[lgb.early_stopping(50), lgb.log_evaluation(-1)],
+        )
+    else:
+        model.fit(X_train, y_train)
+
+    return model
+
+
+def train_catboost(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_val: np.ndarray | None = None,
+    y_val: np.ndarray | None = None,
+    params: dict | None = None,
+) -> CatBoostClassifier:
+    """Train CatBoost classifier with optional early stopping.
+
+    Returns fitted CatBoostClassifier with .predict_proba() interface.
+    """
+    default_params = {
+        'iterations': 500,
+        'depth': 6,
+        'learning_rate': 0.05,
+        'l2_leaf_reg': 3.0,
+        'eval_metric': 'Logloss',
+        'verbose': 0,
+        'random_state': 42,
+    }
+    if params:
+        default_params.update(params)
+
+    model = CatBoostClassifier(**default_params)
+
+    use_early_stopping = X_val is not None and y_val is not None
+    if use_early_stopping:
+        model.fit(
+            X_train, y_train,
+            eval_set=(X_val, y_val),
+            early_stopping_rounds=50,
+        )
+    else:
+        model.fit(X_train, y_train)
+
+    return model
+
+
+def train_ridge(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+) -> Pipeline:
+    """Train L2-regularized logistic regression (Ridge equivalent).
+
+    Uses StandardScaler + LogisticRegression(C=0.1, penalty='l2').
+    Handles NaN by filling with column medians before scaling.
+
+    Returns fitted Pipeline with .predict_proba() interface.
+    """
+    X_train = np.asarray(X_train, dtype=float)
+    # Fill NaN with column medians for linear model
+    col_medians = np.nanmedian(X_train, axis=0)
+    col_medians = np.where(np.isnan(col_medians), 0.0, col_medians)
+    mask = np.isnan(X_train)
+    X_filled = X_train.copy()
+    for j in range(X_filled.shape[1]):
+        X_filled[mask[:, j], j] = col_medians[j]
+
+    pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', LogisticRegression(C=0.1, l1_ratio=0, max_iter=1000, random_state=42)),
+    ])
+    # Store medians for use at predict time
+    pipe.fit(X_filled, y_train)
+    pipe._col_medians = col_medians
+    return pipe
 
 
 def get_feature_importances(model, feature_names: list[str]) -> pd.Series:

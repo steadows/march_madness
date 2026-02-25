@@ -93,13 +93,11 @@ Two types of skills:
 - [x] Phase 1: Data Loading & EDA
 - [x] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
 - [x] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
-- [ ] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
+- [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 4 — Ensemble Pipeline (NOT STARTED)
-<!-- Next agent: read Phase 4 section in PIPELINE_BUILD_GUIDE.md. Load skill: bash skills.sh ensemble-submission -->
-<!-- DO NOT rewrite existing src/models.py, src/cv.py, src/submission.py — ADD to them -->
-<!-- Baseline to beat: M Brier 0.212 (XGBoost), target < 0.205 with weighted ensemble -->
+### 🔵 Current Phase: Phase 5 — Iteration & Improvement (NOT STARTED)
+<!-- Phase 4 complete. Weighted ensemble M=0.1953, W=0.1387. Both beat targets. -->
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -107,13 +105,13 @@ Two types of skills:
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
 |-------|-----|-------|----------|-------|
-| Seed-only logistic | 0.213 | 0.153 | 5 folds (2020-2024) | Floor baseline |
-| Elo-only logistic | — | — | — | |
-| XGBoost | 0.212 | 0.157 | 5 folds (2020-2024) | All 38 features |
-| LightGBM | — | — | — | |
-| CatBoost | — | — | — | |
-| Simple Avg Ensemble | — | — | — | Target: M < 0.210 |
-| Weighted Ensemble | — | — | — | Target: M < 0.205 — **BEST** |
+| Seed-only logistic | 0.202 | 0.147 | 5 folds (2020-2024) | Floor baseline |
+| Ridge (L2 logistic) | 0.202 | 0.143 | 5 folds (2020-2024) | All 38 features |
+| XGBoost | 0.197 | 0.144 | 5 folds (2020-2024) | All 38 features |
+| LightGBM | 0.200 | 0.145 | 5 folds (2020-2024) | All 38 features |
+| CatBoost | 0.197 | 0.140 | 5 folds (2020-2024) | All 38 features |
+| Simple Avg Ensemble | 0.196 | 0.140 | 5 folds (2020-2024) | Beats all singles |
+| Weighted Ensemble | 0.195 | 0.139 | 5 folds (2020-2024) | **BEST** — M: XGB 50%, Cat 33%, Log 13% |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
@@ -124,6 +122,8 @@ Two types of skills:
 - DECISION: seed_num_diff ranks low in XGBoost importance (rank 38) despite -0.48 correlation with target — expected collinearity artifact (POM/MOR/ELO all encode quality). Feature is correct, not a bug.
 - DECISION: coach_tourney_exp_diff is M-only; always 0 for W data (coaches file is M only). OK for GBMs, excluded from W variance checks.
 - DECISION: Training on all seasons (including pre-2003 M, pre-2010 W) gives 31-41% NaN but modern-only (2003+/2010+) is 3.3% NaN. GBMs handle NaN natively.
+- DECISION: M ensemble weights: XGBoost 50%, CatBoost 33%, Logistic 13%, LightGBM 4%, Ridge 0%. Ridge zeroed out by optimizer.
+- DECISION: W ensemble weights: CatBoost 58%, Ridge 22%, Logistic 16%, LightGBM 4%, XGBoost 0%. XGBoost zeroed out for W.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
