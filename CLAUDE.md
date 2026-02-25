@@ -89,14 +89,14 @@ Two types of skills:
 ## 📊 Current Status
 
 ### Phase Progress
-- [ ] Phase 0: Environment Setup
+- [x] Phase 0: Environment Setup
 - [ ] Phase 1: Data Loading & EDA
 - [ ] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
 - [ ] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
 - [ ] Phase 4: Ensemble & Submission Generation
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: NOT STARTED
+### 🔵 Current Phase: Phase 1 — Data Loading & Validation (NOT STARTED)
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -114,6 +114,7 @@ Two types of skills:
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
+- DECISION: Use full path `/opt/anaconda3/envs/march_madness/bin/python` for all Python commands — base env is different
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
