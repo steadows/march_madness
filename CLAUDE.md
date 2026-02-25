@@ -92,11 +92,11 @@ Two types of skills:
 - [x] Phase 0: Environment Setup
 - [x] Phase 1: Data Loading & EDA
 - [x] Phase 2: Feature Engineering (Elo, Massey, Four Factors, Differentials)
-- [ ] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
+- [x] Phase 3: Model Training & CV (XGBoost, LightGBM, CatBoost, Logistic baseline)
 - [ ] Phase 4: Ensemble & Submission Generation
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 3 — CV Framework & Baseline Models (NOT STARTED)
+### 🔵 Current Phase: Pipeline complete — ready for Phase 4 (Ensemble & Submission)
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -104,9 +104,9 @@ Two types of skills:
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
 |-------|-----|-------|----------|-------|
-| Seed-only logistic | — | — | — | Floor baseline |
+| Seed-only logistic | 0.213 | 0.153 | 5 folds (2020-2024) | Floor baseline |
 | Elo-only logistic | — | — | — | |
-| XGBoost | — | — | — | |
+| XGBoost | 0.212 | 0.157 | 5 folds (2020-2024) | All 38 features |
 | LightGBM | — | — | — | |
 | CatBoost | — | — | — | |
 | Simple Avg Ensemble | — | — | — | |
