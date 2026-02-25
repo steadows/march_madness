@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(/opt/anaconda3/envs/march_madness/bin/python *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(git *)",
+      "Bash(conda *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(bash skills.sh*)",
+      "Bash(pip install *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)"
+    ]
+  }
+}
