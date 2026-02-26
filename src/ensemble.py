@@ -37,6 +37,7 @@ def run_all_models_cv(
     feature_cols: list[str],
     target_col: str = 'target',
     gender: str = 'M',
+    model_params: dict | None = None,
 ) -> dict:
     """Run all 5 models through expanding-window CV and collect OOF predictions.
 
@@ -47,6 +48,9 @@ def run_all_models_cv(
         feature_cols: All _diff feature column names.
         target_col: Name of target column.
         gender: 'M' or 'W' (for logging).
+        model_params: Optional dict of tuned hyperparameters per model,
+            e.g. {'xgboost': {...}, 'lightgbm': {...}, 'catboost': {...}}.
+            If None, uses default params for all models.
 
     Returns:
         Dict: {model_name: {'fold_briers': [...], 'mean_brier': float, 'oof_preds': array, 'oof_targets': array}}
@@ -90,21 +94,24 @@ def run_all_models_cv(
         results['ridge']['oof_targets_list'].append(y_val)
 
         # --- XGBoost: all features (handles NaN natively)
-        xgb_model = train_xgboost(X_train_raw.values, y_train, X_val_raw.values, y_val)
+        xgb_params = model_params.get('xgboost') if model_params else None
+        xgb_model = train_xgboost(X_train_raw.values, y_train, X_val_raw.values, y_val, params=xgb_params)
         xgb_preds = clip_predictions(xgb_model.predict_proba(X_val_raw.values)[:, 1])
         results['xgboost']['fold_briers'].append(evaluate_brier(y_val, xgb_preds))
         results['xgboost']['oof_preds_list'].append(xgb_preds)
         results['xgboost']['oof_targets_list'].append(y_val)
 
         # --- LightGBM: all features (handles NaN natively)
-        lgb_model = train_lightgbm(X_train_raw.values, y_train, X_val_raw.values, y_val)
+        lgb_params = model_params.get('lightgbm') if model_params else None
+        lgb_model = train_lightgbm(X_train_raw.values, y_train, X_val_raw.values, y_val, params=lgb_params)
         lgb_preds = clip_predictions(lgb_model.predict_proba(X_val_raw.values)[:, 1])
         results['lightgbm']['fold_briers'].append(evaluate_brier(y_val, lgb_preds))
         results['lightgbm']['oof_preds_list'].append(lgb_preds)
         results['lightgbm']['oof_targets_list'].append(y_val)
 
         # --- CatBoost: all features (handles NaN natively)
-        cat_model = train_catboost(X_train_raw.values, y_train, X_val_raw.values, y_val)
+        cat_params = model_params.get('catboost') if model_params else None
+        cat_model = train_catboost(X_train_raw.values, y_train, X_val_raw.values, y_val, params=cat_params)
         cat_preds = clip_predictions(cat_model.predict_proba(X_val_raw.values)[:, 1])
         results['catboost']['fold_briers'].append(evaluate_brier(y_val, cat_preds))
         results['catboost']['oof_preds_list'].append(cat_preds)

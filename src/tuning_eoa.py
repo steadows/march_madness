@@ -5,7 +5,7 @@ and ensemble weights via population-based metaheuristic search.
 """
 import numpy as np
 import pandas as pd
-from mealpy import FloatVar, EOA
+from mealpy import FloatVar, EOA, Termination
 from torch.utils.tensorboard import SummaryWriter
 
 from src.tuning import (
@@ -22,6 +22,7 @@ def tune_model_eoa(
     gender: str = 'M',
     epoch: int = 100,
     pop_size: int = 30,
+    patience: int = 15,
     log_dir: str | None = None,
 ) -> dict:
     """Tune a single model's hyperparameters using Earthworm Optimization.
@@ -73,6 +74,8 @@ def tune_model_eoa(
         'obj_func': objective_function,
     }
 
+    term = Termination(max_epoch=epoch, max_early_stop=patience)
+
     model = EOA.OriginalEOA(
         epoch=epoch,
         pop_size=pop_size,
@@ -84,7 +87,7 @@ def tune_model_eoa(
         gama=0.9,
     )
 
-    g_best = model.solve(problem_dict)
+    g_best = model.solve(problem_dict, termination=term)
 
     if writer:
         writer.close()
@@ -109,6 +112,7 @@ def tune_ensemble_weights_eoa(
     y_true: np.ndarray,
     epoch: int = 200,
     pop_size: int = 20,
+    patience: int = 15,
     log_dir: str | None = None,
 ) -> dict:
     """Optimize ensemble weights using Earthworm Optimization.
@@ -156,6 +160,8 @@ def tune_ensemble_weights_eoa(
         'obj_func': objective_function,
     }
 
+    term = Termination(max_epoch=epoch, max_early_stop=patience)
+
     model = EOA.OriginalEOA(
         epoch=epoch,
         pop_size=pop_size,
@@ -167,7 +173,7 @@ def tune_ensemble_weights_eoa(
         gama=0.9,
     )
 
-    g_best = model.solve(problem_dict)
+    g_best = model.solve(problem_dict, termination=term)
 
     if writer:
         writer.close()

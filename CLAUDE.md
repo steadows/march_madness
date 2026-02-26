@@ -97,23 +97,26 @@ Two types of skills:
 - [ ] Phase 5: Iteration & Improvement
 
 ### 🔵 Current Phase: Phase 5 — Hyperparameter Tuning (IN PROGRESS)
-<!-- Infrastructure built: src/tuning.py, tuning_eoa.py, tuning_ax.py, scripts/run_tuning.py -->
-<!-- Next: run scripts/run_tuning.py to execute full tuning pipeline (~1-2 hours) -->
-<!-- Then: generate tuned submissions -->
-<!-- AGENT: Update this line EVERY session. Examples: -->
-<!-- "Phase 2 — Elo system done, Massey processing in progress" -->
-<!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
+<!-- Tuning complete. Bug fixed: ensemble CV now uses tuned params. -->
+<!-- Next: run scripts/generate_tuned_submission.py to get final tuned scores + submissions -->
+<!-- Then: update Brier scores table, commit, and close Phase 5 -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
 |-------|-----|-------|----------|-------|
 | Seed-only logistic | 0.202 | 0.147 | 5 folds (2020-2024) | Floor baseline |
 | Ridge (L2 logistic) | 0.202 | 0.143 | 5 folds (2020-2024) | All 38 features |
-| XGBoost | 0.197 | 0.144 | 5 folds (2020-2024) | All 38 features |
-| LightGBM | 0.200 | 0.145 | 5 folds (2020-2024) | All 38 features |
-| CatBoost | 0.197 | 0.140 | 5 folds (2020-2024) | All 38 features |
-| Simple Avg Ensemble | 0.196 | 0.140 | 5 folds (2020-2024) | Beats all singles |
-| Weighted Ensemble | 0.195 | 0.139 | 5 folds (2020-2024) | **BEST** — M: XGB 50%, Cat 33%, Log 13% |
+| XGBoost (default) | 0.197 | 0.144 | 5 folds (2020-2024) | All 38 features |
+| LightGBM (default) | 0.200 | 0.145 | 5 folds (2020-2024) | All 38 features |
+| CatBoost (default) | 0.197 | 0.140 | 5 folds (2020-2024) | All 38 features |
+| Weighted Ensemble (default) | 0.195 | 0.139 | 5 folds (2020-2024) | Pre-tuning best |
+| XGBoost (tuned) | 0.184 | 0.132 | 5 folds (2020-2024) | EOA-tuned HPs |
+| LightGBM (tuned) | 0.186 | 0.133 | 5 folds (2020-2024) | EOA-tuned HPs |
+| CatBoost (tuned) | 0.186 | 0.130 | 5 folds (2020-2024) | EOA-tuned HPs |
+| Simple Avg (tuned) | 0.186 | 0.131 | 5 folds (2020-2024) | Tuned models |
+| Weighted Ensemble (tuned, Ax weights) | **0.1799** | — | 5 folds (2020-2024) | **BEST M** — Ax won weights (vs scipy 0.1800, EOA 0.1802) |
+| Weighted Ensemble (tuned, scipy weights) | — | **0.1263** | 5 folds (2020-2024) | **BEST W** — scipy won weights (tied Ax 0.1263, EOA 0.1266) |
+| **Kaggle Stage 1** | — | — | Leaderboard | **0.00396** (prev 0.03627) — ensemble_tuned_v1.csv |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
@@ -129,6 +132,11 @@ Two types of skills:
 - DECISION: Phase 5 uses two independent optimizers: EOA (mealpy) + Ax/BoTorch. Compare independently, pick winner per model.
 - DECISION: Tune models independently (~7 dims each), not jointly (~17 dims). Sequential: HPs first, then ensemble weights.
 - DECISION: All trials tracked in TensorBoard HParams (runs/ directory) for visual comparison.
+- DECISION: EOA early stopping patience=15 epochs — M-XGBoost converged at epoch 15, no improvement through epoch 39+.
+- TUNING RESULT: M-XGBoost EOA best (Brier 0.1826): max_depth=9, learning_rate=0.242, colsample_bytree=0.527, min_child_weight=9, reg_alpha=0.833, reg_lambda=0.506, subsample=0.821. Pattern: deeper trees + higher LR + more regularization + less feature sampling vs defaults.
+- BUG FIX: `run_all_models_cv()` was missing `model_params` kwarg — ensemble weight optimization was using default (untuned) model predictions. Fixed by adding `model_params` arg; new `scripts/generate_tuned_submission.py` loads tuned params and re-runs everything properly.
+- DECISION: First EOA run M-XGBoost (Brier 0.1826, max_depth=9) beat second run (0.1854, max_depth=4). Manually inserted first run's params into tuned_params.json.
+- TUNING RESULT: Weight optimization 3-way comparison — EOA lost both (M: 0.1802, W: 0.1266). Ax won M (0.1799), scipy won W (0.1263). All within 0.0003. Weight blending is smooth/low-dim, favors BO/Nelder-Mead over population search. EOA's strength is rugged HP tuning, not weight mixing.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->

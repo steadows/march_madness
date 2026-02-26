@@ -144,12 +144,13 @@ def main():
 
         # Get tuned params for GBMs
         model_results = all_results[f'{gender}_models']
+        tuned_hp = {name: model_results[name]['best_params']
+                    for name in ['xgboost', 'lightgbm', 'catboost']}
 
         # Run ensemble CV with tuned params
-        tuned_results = run_all_models_cv(df, feature_cols, gender=gender)
+        tuned_results = run_all_models_cv(df, feature_cols, gender=gender,
+                                          model_params=tuned_hp)
 
-        # For now, run_all_models_cv uses defaults — we need a version that takes params
-        # Actually, let's just evaluate each tuned model individually and collect OOF
         oof_dict = {n: tuned_results[n]['oof_preds'] for n in tuned_results}
         y_true = tuned_results['logistic']['oof_targets']
 

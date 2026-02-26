@@ -670,29 +670,36 @@ submissions/ensemble_2026.csv    — NEW: Stage 2 (2026) ensemble submission
 - `src/tuning_eoa.py` — `tune_model_eoa()`, `tune_ensemble_weights_eoa()` via mealpy `EOA.OriginalEOA`
 - `src/tuning_ax.py` — `tune_model_ax()`, `tune_ensemble_weights_ax()` via Ax `AxClient` + BoTorch GP
 - `scripts/run_tuning.py` — end-to-end orchestration: tune all models × both methods × both genders
+- `scripts/generate_tuned_submission.py` — loads tuned params, re-runs ensemble CV with tuned HPs, re-optimizes weights, trains final models, generates submissions
 - `tests/test_tuning.py` — 12 tests covering search spaces, evaluation, EOA, Ax
+
+### Bug Fix: Ensemble CV Now Uses Tuned Params
+The original `run_all_models_cv()` in `src/ensemble.py` had no way to accept custom hyperparameters — it always used defaults. This meant the ensemble weight optimization in `scripts/run_tuning.py` was optimizing weights against **untuned** model predictions, even after tuning found better HPs. Fixed by:
+1. Adding `model_params` kwarg to `run_all_models_cv()` (defaults to None for backward compat)
+2. Fixing `scripts/run_tuning.py` to pass tuned params through for future runs
+3. New `scripts/generate_tuned_submission.py` loads saved tuned params and generates proper submissions
 
 ### GSD Checklist — Run Tuning
 
-- [ ] `python scripts/run_tuning.py` — run full tuning pipeline (est. 1-2 hours)
-- [ ] TensorBoard logs in `runs/` — verify with `tensorboard --logdir runs/`
-- [ ] `artifacts/tuning_results.json` — complete comparison of EOA vs Ax per model/gender
-- [ ] `artifacts/tuned_params.json` — best params per model per gender
+- [x] `python scripts/run_tuning.py` — run full tuning pipeline (est. 1-2 hours)
+- [x] TensorBoard logs in `runs/` — verify with `tensorboard --logdir runs/`
+- [x] `artifacts/tuning_results.json` — complete comparison of EOA vs Ax per model/gender
+- [x] `artifacts/tuned_params.json` — best params per model per gender
 
 ### GSD Checklist — Tuned Submission
 
-- [ ] Update `scripts/generate_ensemble_submission.py` to load tuned params
-- [ ] Generate `submissions/ensemble_tuned_v1.csv` (Stage 1, 519,144 rows)
-- [ ] Generate `submissions/ensemble_tuned_2026.csv` (Stage 2)
-- [ ] Validate both submissions
+- [x] New `scripts/generate_tuned_submission.py` loads tuned params, re-runs CV, re-optimizes weights, generates submissions
+- [x] Generate `submissions/ensemble_tuned_v1.csv` (Stage 1, 519,144 rows) — VALID
+- [x] Generate `submissions/ensemble_tuned_2026.csv` (Stage 2, 132,133 rows) — VALID
+- [x] Validate both submissions — preds in [0.05, 0.95], std > 0.05
 
 ### GSD Checklist — Phase Wrap
 
-- [ ] `pytest tests/ -q` — ALL tests pass
-- [ ] TensorBoard HParams dashboard viewable
-- [ ] Tuned ensemble Brier < 0.195 for M
+- [x] `pytest tests/ -q` — 186 passed
+- [x] TensorBoard HParams dashboard viewable
+- [x] Tuned ensemble Brier < 0.195 for M — achieved **0.180**
 - [ ] `git add -A && git commit -m "phase 5: hyperparameter tuning complete"`
-- [ ] Update `CLAUDE.md`: scores, phase status, key decisions
+- [x] Update `CLAUDE.md`: scores, phase status, key decisions
 
 ---
 
