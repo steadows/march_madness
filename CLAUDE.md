@@ -96,8 +96,10 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5 — Iteration & Improvement (NOT STARTED)
-<!-- Phase 4 complete. Weighted ensemble M=0.1953, W=0.1387. Both beat targets. -->
+### 🔵 Current Phase: Phase 5 — Hyperparameter Tuning (IN PROGRESS)
+<!-- Infrastructure built: src/tuning.py, tuning_eoa.py, tuning_ax.py, scripts/run_tuning.py -->
+<!-- Next: run scripts/run_tuning.py to execute full tuning pipeline (~1-2 hours) -->
+<!-- Then: generate tuned submissions -->
 <!-- AGENT: Update this line EVERY session. Examples: -->
 <!-- "Phase 2 — Elo system done, Massey processing in progress" -->
 <!-- "Phase 3 — XGBoost trained (Brier 0.19), starting LightGBM" -->
@@ -124,6 +126,9 @@ Two types of skills:
 - DECISION: Training on all seasons (including pre-2003 M, pre-2010 W) gives 31-41% NaN but modern-only (2003+/2010+) is 3.3% NaN. GBMs handle NaN natively.
 - DECISION: M ensemble weights: XGBoost 50%, CatBoost 33%, Logistic 13%, LightGBM 4%, Ridge 0%. Ridge zeroed out by optimizer.
 - DECISION: W ensemble weights: CatBoost 58%, Ridge 22%, Logistic 16%, LightGBM 4%, XGBoost 0%. XGBoost zeroed out for W.
+- DECISION: Phase 5 uses two independent optimizers: EOA (mealpy) + Ax/BoTorch. Compare independently, pick winner per model.
+- DECISION: Tune models independently (~7 dims each), not jointly (~17 dims). Sequential: HPs first, then ensemble weights.
+- DECISION: All trials tracked in TensorBoard HParams (runs/ directory) for visual comparison.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->

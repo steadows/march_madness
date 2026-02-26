@@ -654,6 +654,48 @@ submissions/ensemble_2026.csv    — NEW: Stage 2 (2026) ensemble submission
 
 ---
 
+## Phase 5: Hyperparameter Tuning — EOA + Ax/BoTorch
+
+**Load skill:** `bash skills.sh hyperparameter-tuning`
+
+> **Goal: tune individual model HPs and ensemble weights using two independent optimizers. Track all trials in TensorBoard HParams. Target: M Brier < 0.195.**
+
+### Design Decisions
+1. **EOA vs Ax: Independent (compare)** — run both on the same tasks, pick the winner per model
+2. **Search scope: Independent per model** — XGBoost (~7 dims), LightGBM (~7 dims), CatBoost (~3 dims)
+3. **Weight tuning: Sequential** — first tune model HPs, then optimize ensemble weights with tuned models
+
+### Infrastructure Already Built
+- `src/tuning.py` — search spaces, `evaluate_params()`, `evaluate_ensemble_weights()`, TensorBoard HParams logging
+- `src/tuning_eoa.py` — `tune_model_eoa()`, `tune_ensemble_weights_eoa()` via mealpy `EOA.OriginalEOA`
+- `src/tuning_ax.py` — `tune_model_ax()`, `tune_ensemble_weights_ax()` via Ax `AxClient` + BoTorch GP
+- `scripts/run_tuning.py` — end-to-end orchestration: tune all models × both methods × both genders
+- `tests/test_tuning.py` — 12 tests covering search spaces, evaluation, EOA, Ax
+
+### GSD Checklist — Run Tuning
+
+- [ ] `python scripts/run_tuning.py` — run full tuning pipeline (est. 1-2 hours)
+- [ ] TensorBoard logs in `runs/` — verify with `tensorboard --logdir runs/`
+- [ ] `artifacts/tuning_results.json` — complete comparison of EOA vs Ax per model/gender
+- [ ] `artifacts/tuned_params.json` — best params per model per gender
+
+### GSD Checklist — Tuned Submission
+
+- [ ] Update `scripts/generate_ensemble_submission.py` to load tuned params
+- [ ] Generate `submissions/ensemble_tuned_v1.csv` (Stage 1, 519,144 rows)
+- [ ] Generate `submissions/ensemble_tuned_2026.csv` (Stage 2)
+- [ ] Validate both submissions
+
+### GSD Checklist — Phase Wrap
+
+- [ ] `pytest tests/ -q` — ALL tests pass
+- [ ] TensorBoard HParams dashboard viewable
+- [ ] Tuned ensemble Brier < 0.195 for M
+- [ ] `git add -A && git commit -m "phase 5: hyperparameter tuning complete"`
+- [ ] Update `CLAUDE.md`: scores, phase status, key decisions
+
+---
+
 ## Escalation Protocol
 
 ### 🔴 STOP — Escalate Immediately
