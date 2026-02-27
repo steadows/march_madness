@@ -96,12 +96,10 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5b — Barttorvik Integration (Steps 1-5 done, Step 6 next)
-<!-- Steps 1-5 complete: name mapping, data loading, feature pipeline integration, spot-checks, differentials -->
-<!-- 47 features now (38 original + 9 Barttorvik). Feature matrices rebuilt. 227 tests passing. -->
-<!-- Step 6: run scripts/generate_barttorvik_submission.py to retrain with existing tuned HPs + new features -->
-<!-- Step 7: if scores improve, generate final submission -->
-<!-- All pre-Barttorvik artifacts backed up with _pre_barttorvik suffix -->
+### 🔵 Current Phase: Phase 5b — Barttorvik Integration Complete
+<!-- Steps 1-7 done. Kaggle 0.00338 (new best). Key insight: don't re-optimize weights, old ones generalize better. -->
+<!-- 47 features (38 original + 9 Barttorvik). Best submission: ensemble_barttorvik_oldweights_v1.csv -->
+<!-- Next: consider HP retuning with new features, or other external data sources -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
@@ -118,7 +116,9 @@ Two types of skills:
 | Simple Avg (tuned) | 0.186 | 0.131 | 5 folds (2020-2024) | Tuned models |
 | Weighted Ensemble (tuned, Ax weights) | **0.1799** | — | 5 folds (2020-2024) | **BEST M** — Ax won weights (vs scipy 0.1800, EOA 0.1802) |
 | Weighted Ensemble (tuned, scipy weights) | — | **0.1263** | 5 folds (2020-2024) | **BEST W** — scipy won weights (tied Ax 0.1263, EOA 0.1266) |
-| **Kaggle Stage 1** | — | — | Leaderboard | **0.00396** (prev 0.03627) — ensemble_tuned_v1.csv |
+| Kaggle Stage 1 (pre-BT) | — | — | Leaderboard | 0.00396 — ensemble_tuned_v1.csv |
+| Kaggle Stage 1 (BT, new weights) | — | — | Leaderboard | 0.00853 — ensemble_barttorvik_v1.csv (weight reopt overfit) |
+| **Kaggle Stage 1 (BT, old weights)** | — | — | Leaderboard | **0.00338** — ensemble_barttorvik_oldweights_v1.csv **NEW BEST** |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
@@ -145,6 +145,8 @@ Two types of skills:
 - DECISION: Barttorvik NaN is expected: M 56.3% (pre-2008 seasons), W 80.7% (pre-2021). Zero NaN in covered seasons. GBMs handle natively.
 - DECISION: All 9 Barttorvik features passed through as differentials — no feature selection yet. GBMs handle irrelevant features via tree splits. Prune later if needed based on feature importance after retraining.
 - DECISION: Retrain with existing tuned HPs first (isolate feature effect), then optionally retune HPs. Script: `scripts/generate_barttorvik_submission.py` — reads `tuned_params_pre_barttorvik.json`, writes to new `*_barttorvik*` paths only. Nothing overwritten.
+- RESULT: Barttorvik features + old weights = Kaggle **0.00338** (new best, was 0.00396). Barttorvik features + re-optimized weights = 0.00853 (regression). Weight re-optimization on 5-fold OOF overfit — LightGBM jumped to 68% based on CV but didn't generalize. Old diversified weights (XGB 38%, LGBM 34%, CatBoost 28%) are more robust.
+- DECISION: Do NOT re-optimize ensemble weights after adding features. The old pre-Barttorvik weights generalize better. Only retune weights with more data or a different strategy (e.g., nested CV).
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
