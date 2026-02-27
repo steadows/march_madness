@@ -138,7 +138,7 @@ Two types of skills:
 - BUG FIX: `run_all_models_cv()` was missing `model_params` kwarg — ensemble weight optimization was using default (untuned) model predictions. Fixed by adding `model_params` arg; new `scripts/generate_tuned_submission.py` loads tuned params and re-runs everything properly.
 - DECISION: First EOA run M-XGBoost (Brier 0.1826, max_depth=9) beat second run (0.1854, max_depth=4). Manually inserted first run's params into tuned_params.json.
 - TUNING RESULT: Weight optimization 3-way comparison — EOA lost both (M: 0.1802, W: 0.1266). Ax won M (0.1799), scipy won W (0.1263). All within 0.0003. Weight blending is smooth/low-dim, favors BO/Nelder-Mead over population search. EOA's strength is rugged HP tuning, not weight mixing.
-- DATA: Barttorvik ratings downloaded (2008-2026, 19 files in data/barttorvik/). 365 teams for 2026. Key new features: adjoe, adjde, barthag, adjt (tempo), WAB, elite.SOS, Qual.O/D/Barthag. Men's only — need MTeamSpellings.csv to match team names to TeamIDs.
+- DATA: Barttorvik ratings downloaded. Men: 2008-2026 (19 files, 365 teams). Women: 2021-2026 (6 files, 355-363 teams; 2008-2020 only had 15 teams, deleted). All in data/barttorvik/. Key new features: adjoe, adjde, barthag, adjt (tempo), WAB, elite.SOS, Qual.O/D/Barthag. Need MTeamSpellings.csv to match team names to TeamIDs.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
