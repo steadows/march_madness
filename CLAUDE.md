@@ -96,11 +96,12 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5 — Complete. Next: Barttorvik Feature Integration
-<!-- Tuning done. Pipeline fixed. Submissions generated. Kaggle Stage 1: 0.004. -->
-<!-- Next session: integrate Barttorvik data (data/barttorvik/, 2008-2026, 19 files) -->
-<!-- Match team names via MTeamSpellings.csv, add adjoe/adjde/barthag/adjt/WAB/elite.SOS -->
-<!-- Retrain + retune with expanded features, generate improved submission -->
+### 🔵 Current Phase: Phase 5b — Barttorvik Integration (Steps 1-5 done, Step 6 next)
+<!-- Steps 1-5 complete: name mapping, data loading, feature pipeline integration, spot-checks, differentials -->
+<!-- 47 features now (38 original + 9 Barttorvik). Feature matrices rebuilt. 227 tests passing. -->
+<!-- Step 6: run scripts/generate_barttorvik_submission.py to retrain with existing tuned HPs + new features -->
+<!-- Step 7: if scores improve, generate final submission -->
+<!-- All pre-Barttorvik artifacts backed up with _pre_barttorvik suffix -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
@@ -139,6 +140,11 @@ Two types of skills:
 - DECISION: First EOA run M-XGBoost (Brier 0.1826, max_depth=9) beat second run (0.1854, max_depth=4). Manually inserted first run's params into tuned_params.json.
 - TUNING RESULT: Weight optimization 3-way comparison — EOA lost both (M: 0.1802, W: 0.1266). Ax won M (0.1799), scipy won W (0.1263). All within 0.0003. Weight blending is smooth/low-dim, favors BO/Nelder-Mead over population search. EOA's strength is rugged HP tuning, not weight mixing.
 - DATA: Barttorvik ratings downloaded. Men: 2008-2026 (19 files, 365 teams). Women: 2021-2026 (6 files, 355-363 teams; 2008-2020 only had 15 teams, deleted). All in data/barttorvik/. Key new features: adjoe, adjde, barthag, adjt (tempo), WAB, elite.SOS, Qual.O/D/Barthag. Need MTeamSpellings.csv to match team names to TeamIDs.
+- BUG FIX: Barttorvik pre-2023 CSV files (44 cols) have column alignment shift — numeric `rank` column absent, everything shifted left by 1. `Fun.Rk..adjt` column actually contains `adjt`. Fixed in `load_barttorvik_ratings()` by detecting 44-col files and reassigning headers. This means `adjt` is available for ALL years (2008+), not just 2023+.
+- DATA: Barttorvik name mapping: 370 M teams, 365 W teams, 0 unmatched. 12 manual overrides per gender (e.g. "Arkansas Pine Bluff", "Winston Salem St.", "Saint Francis" = PA not NY). 100% tournament team coverage.
+- DECISION: Barttorvik NaN is expected: M 56.3% (pre-2008 seasons), W 80.7% (pre-2021). Zero NaN in covered seasons. GBMs handle natively.
+- DECISION: All 9 Barttorvik features passed through as differentials — no feature selection yet. GBMs handle irrelevant features via tree splits. Prune later if needed based on feature importance after retraining.
+- DECISION: Retrain with existing tuned HPs first (isolate feature effect), then optionally retune HPs. Script: `scripts/generate_barttorvik_submission.py` — reads `tuned_params_pre_barttorvik.json`, writes to new `*_barttorvik*` paths only. Nothing overwritten.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
@@ -146,15 +152,16 @@ Two types of skills:
 
 ### 📋 Feature Columns
 <!-- After Phase 2, list ALL final feature column names here. Phase 3 reads this list instead of re-deriving. -->
-38 differential features (all end in `_diff`), see `artifacts/feature_columns.json` for full list.
-Key features: `win_pct`, `pts_per_game`, `pts_allowed_per_game`, `off_eff`, `def_eff`, `net_eff`,
+47 differential features (all end in `_diff`), see `artifacts/feature_columns.json` for full list.
+**Original 38:** `win_pct`, `pts_per_game`, `pts_allowed_per_game`, `off_eff`, `def_eff`, `net_eff`,
 `efg_pct`, `to_rate`, `or_pct`, `ft_rate`, `fg3_rate`, `ast_to_ratio`, `stl_per_game`, `blk_per_game`,
 `recent_win_pct`, `recent_off_eff`, `recent_def_eff`, `recent_net_eff`, `recent_efg_pct`,
 `recent_to_rate`, `recent_or_pct`, `recent_ft_rate`, `recent_fg3_rate`,
 `recent_pts_per_game`, `recent_pts_allowed_per_game`,
 `elo`, `pom_rank`, `sag_rank`, `mor_rank`, `wol_rank`, `dol_rank`, `col_rank`, `rpi_rank`, `ap_rank`, `usa_rank`,
 `seed_num`, `sos_elo`, `coach_tourney_exp`
-Feature matrix files: `artifacts/features_men.csv` (2585×42), `artifacts/features_women.csv` (1717×42)
+**New 9 (Barttorvik):** `adjoe`, `adjde`, `barthag`, `adjt`, `wab`, `elite_sos`, `qual_o`, `qual_d`, `qual_barthag`
+Feature matrix files: `artifacts/features_men.csv` (2585×51), `artifacts/features_women.csv` (1717×51)
 To get feature cols: `[c for c in df.columns if c.endswith('_diff')]`
 
 ---
@@ -185,6 +192,16 @@ PIPELINE_BUILD_GUIDE.md  — Phase-by-phase build spec with verification checks
 COMPETITION.md           — Full competition details, data dictionary, methods research
 skills.sh                — Skill index and loader (bash skills.sh <name>)
 .claude/skills/*.md      — Individual skill files
+src/barttorvik.py        — Barttorvik data loading, name mapping, column alignment fix
+scripts/generate_barttorvik_submission.py — Retrain + submit with Barttorvik features (safe, new output paths)
+```
+
+### Pre-Barttorvik Backups (rollback artifacts)
+```
+artifacts/features_men_pre_barttorvik.csv
+artifacts/features_women_pre_barttorvik.csv
+artifacts/tuned_params_pre_barttorvik.json
+artifacts/tuning_results_pre_barttorvik.json
 ```
 
 ### Conda Environment
