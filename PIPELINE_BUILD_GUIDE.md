@@ -703,6 +703,153 @@ The original `run_all_models_cv()` in `src/ensemble.py` had no way to accept cus
 
 ---
 
+## Phase 5b: Barttorvik Feature Integration
+
+**Load skill:** `bash skills.sh external-data`
+
+> **Goal: integrate Barttorvik advanced team ratings into the feature pipeline. These are high-signal efficiency metrics that should meaningfully improve predictions. Data accuracy is paramount — every join must be verified before training.**
+
+### Why Barttorvik?
+Barttorvik (T-Rank) is one of the most respected NCAA team rating systems. It provides adjusted efficiency metrics that account for opponent strength and game pace — exactly the kind of features that complement our existing Elo/Massey/Four Factors pipeline. Key advantages:
+- **Adjusted** for opponent quality (unlike raw stats)
+- **Tempo-free** (per-possession, not per-game)
+- **Proven predictive power** in the analytics community
+- Available for Men 2008–2026 and Women 2021–2026
+
+### Data Inventory
+
+| Dataset | Files | Seasons | Teams/Year | Location |
+|---------|-------|---------|------------|----------|
+| Men's ratings | 19 CSVs | 2008–2026 | 341–365 | `data/barttorvik/barttorvik_ratings_YYYY.csv` |
+| Women's ratings | 6 CSVs | 2021–2026 | 355–363 | `data/barttorvik/barttorvik_w_ratings_YYYY.csv` |
+
+Each CSV has 45 columns. We extract **9 features** per team:
+
+| Feature | Description | Men Range | Women Range |
+|---------|-------------|-----------|-------------|
+| `adjoe` | Adjusted offensive efficiency (pts/100 poss) | 88–134 | 70–133 |
+| `adjde` | Adjusted defensive efficiency (pts/100 poss, lower=better) | 92–128 | 67–115 |
+| `barthag` | Power rating (est. win prob vs average D1 team) | 0.03–0.98 | 0.006–0.999 |
+| `adjt` | Adjusted tempo (possessions per 40 min) | 62–74 | 62–78 |
+| `WAB` | Wins Above Bubble (quality wins metric) | -22 to +10 | -25 to +14 |
+| `elite.SOS` | Elite strength of schedule | 0.59–0.95 | 0.42–0.96 |
+| `Qual.O` | Offensive efficiency in quality games | 0–149 | 0–134 |
+| `Qual.D` | Defensive efficiency in quality games | 0–140 | 0–122 |
+| `Qual.Barthag` | Power rating in quality games | 0–0.99 | 0–0.999 |
+
+**NaN expectations:** Men pre-2008 and Women pre-2021 will have no Barttorvik data. GBMs handle NaN natively — this is fine. Qual.O/D/Barthag can be 0.000 for teams with zero quality games — this is real data, not missing.
+
+### Name Matching Strategy
+
+Barttorvik uses team names (e.g. `"Michigan"`, `"UConn"`). Kaggle uses numeric TeamIDs. Mapping files:
+- `data/MTeamSpellings.csv` — 1,178 spelling variants → Men's TeamIDs
+- `data/WTeamSpellings.csv` — Women's equivalent (TeamIDs 3xxx)
+
+**Matching approach:**
+1. Normalize both sides: lowercase, strip whitespace, remove periods/punctuation
+2. Direct lookup in spellings file
+3. For mismatches: try common transformations (e.g. `"st."` → `"saint"`, `"state"` → `"st"`)
+4. Log ALL unmatched teams — must be zero for tournament teams, <5% overall
+5. Manual override dict for stubborn edge cases
+
+### GSD Checklist — Step 1: Team Name Mapping
+
+- [ ] Load `MTeamSpellings.csv` and `WTeamSpellings.csv`
+- [ ] Build normalized lookup: `barttorvik_name → TeamID`
+- [ ] Test against all 25 Barttorvik files — count matched vs unmatched per file
+- [ ] Log unmatched teams to `artifacts/barttorvik_unmatched.txt`
+- [ ] Target: **100% match rate for all tournament teams** (check against `MNCAATourneySeeds.csv`)
+- [ ] Target: **>95% overall match rate** (some non-D1 or disbanded teams may not match)
+- [ ] Build manual override dict for any remaining mismatches
+- [ ] Write `tests/test_barttorvik.py` — test mapping completeness, no duplicate TeamIDs per season
+- [ ] Verify: `src/barttorvik.py::build_name_mapping()` returns a clean dict
+
+### GSD Checklist — Step 2: Data Loading & Validation
+
+- [ ] Write `src/barttorvik.py::load_barttorvik_ratings(gender)` — reads all CSVs, applies name mapping, returns DataFrame with columns: `Season, TeamID, adjoe, adjde, barthag, adjt, WAB, elite_sos, qual_o, qual_d, qual_barthag`
+- [ ] Rename columns to snake_case (e.g. `elite.SOS` → `elite_sos`, `Qual.O` → `qual_o`)
+- [ ] Validate no duplicate `(Season, TeamID)` rows
+- [ ] Validate column types — all 9 features are float64
+- [ ] Validate value ranges match the table above (flag outliers > 3σ from mean)
+- [ ] Validate team counts per season match expectations (341–365 M, 355–363 W)
+- [ ] Write tests: schema validation, no duplicates, range checks, NaN counts
+
+### GSD Checklist — Step 3: Join to Feature Matrix
+
+- [ ] Merge Barttorvik features into existing feature pipeline by `(Season, TeamID)`
+- [ ] Merge for both TeamA and TeamB sides (same pattern as existing Elo/Massey features)
+- [ ] Verify join quality: count matched rows vs total rows
+- [ ] Expected NaN rates: Men ~30% (seasons 1985–2007 have no data), Women ~50% (seasons 1998–2020 have no data)
+- [ ] Verify no accidental row duplication from the merge (row count before == row count after)
+- [ ] Verify no existing columns were corrupted by the merge (spot-check 5 existing features)
+
+### GSD Checklist — Step 4: Spot-Check Accuracy (THE TRUST GATE)
+
+> **Nothing proceeds past this step until spot-checks pass. This is where we catch silent data bugs.**
+
+- [ ] Pick **12 specific team-seasons** to verify (mix of profiles):
+  - Men recent: Michigan 2026, Duke 2026, Gonzaga 2024
+  - Men older: Kansas 2008, North Carolina 2010
+  - Men mid-major: a mid-major from 2018
+  - Women recent: UConn 2026, South Carolina 2025, Iowa 2024
+  - Women older: Stanford 2021
+  - Edge cases: a team with 0 quality games, a team near the bottom of rankings
+- [ ] For each: print Barttorvik values from merged DataFrame vs values from raw CSV side-by-side
+- [ ] All 12 must match exactly (within float precision) — **zero tolerance for mismatches**
+- [ ] Check that season alignment is correct (2026 Barttorvik data maps to Season=2026, not 2025)
+- [ ] Check that team swaps produce negated differentials (verify symmetry)
+
+### GSD Checklist — Step 5: Differential Features
+
+- [ ] Create `_diff` features for all 9 Barttorvik columns: `adjoe_diff, adjde_diff, barthag_diff, adjt_diff, wab_diff, elite_sos_diff, qual_o_diff, qual_d_diff, qual_barthag_diff`
+- [ ] **Note on adjde:** lower adjde = better defense. `adjde_diff = TeamA - TeamB` means positive = TeamA has WORSE defense. This is correct and consistent — the model will learn the sign. Do NOT flip it.
+- [ ] Verify symmetry: for any matchup, swapping TeamA ↔ TeamB should negate all `_diff` features
+- [ ] Check correlation with target: `barthag_diff` and `wab_diff` should positively correlate with winning. `adjde_diff` should negatively correlate (higher = worse defense).
+- [ ] Update `artifacts/feature_columns.json` — should go from 38 to 47 features
+- [ ] Export updated feature matrices: `artifacts/features_men.csv`, `artifacts/features_women.csv`
+- [ ] Write tests: symmetry, correlation sign checks, feature count validation
+
+### GSD Checklist — Step 6: Retrain & Compare (Feature Isolation Test)
+
+- [ ] Retrain all 4 models (XGBoost, LightGBM, CatBoost, Ridge) with **existing tuned HPs** + expanded features
+- [ ] Run full 5-fold CV (same folds as before for apples-to-apples comparison)
+- [ ] Compare Brier scores before/after:
+
+| Model | M Before | M After | W Before | W After |
+|-------|----------|---------|----------|---------|
+| XGBoost | 0.184 | — | 0.132 | — |
+| LightGBM | 0.186 | — | 0.133 | — |
+| CatBoost | 0.186 | — | 0.130 | — |
+| Ridge | 0.202 | — | 0.143 | — |
+| Weighted Ensemble | 0.180 | — | 0.126 | — |
+
+- [ ] **If any model degrades by > 0.005**: STOP. Investigate for data bugs, feature leakage, or overfitting.
+- [ ] **If models improve or stay flat**: proceed to submission.
+- [ ] Check feature importances — Barttorvik features should rank in top 15 (barthag, WAB especially)
+
+### GSD Checklist — Step 7: New Submission
+
+- [ ] Re-optimize ensemble weights with expanded feature set
+- [ ] Train final models on all available data
+- [ ] Generate `submissions/ensemble_barttorvik_v1.csv` (Stage 1, 519,144 rows)
+- [ ] Generate `submissions/ensemble_barttorvik_2026.csv` (Stage 2, 132,133 rows)
+- [ ] Validate: preds in [0.05, 0.95], std > 0.05, correct row count, correct ID format
+- [ ] Compare prediction distribution vs previous submission (`ensemble_tuned_v1.csv`):
+  - Mean pred should be similar (~0.50)
+  - Std should be similar or slightly higher (more signal = more confident predictions)
+  - Scatter plot: old pred vs new pred — should be highly correlated with tighter spread
+- [ ] Update `CLAUDE.md` with new Brier scores and key decisions
+
+### GSD Checklist — Phase 5b Wrap
+
+- [ ] `pytest tests/ -q` — all tests pass (including new `test_barttorvik.py`)
+- [ ] All spot-checks pass (Step 4)
+- [ ] Brier scores improved or flat vs pre-Barttorvik
+- [ ] `git add -A && git commit -m "phase 5b: barttorvik feature integration"`
+- [ ] Update `CLAUDE.md`: scores, phase status, feature list, key decisions
+
+---
+
 ## Escalation Protocol
 
 ### 🔴 STOP — Escalate Immediately
