@@ -1,5 +1,6 @@
 """Tests for Barttorvik data loading and team name mapping."""
 
+import numpy as np
 import pandas as pd
 import pytest
 from src.barttorvik import (
@@ -227,3 +228,75 @@ class TestLoadRatings:
         assert 120 < row["adjoe"] < 125
         assert 84 < row["adjde"] < 90
         assert 0.97 < row["barthag"] < 0.99
+
+
+class TestDifferentialFeatures:
+    """Tests for Barttorvik differential features in the feature matrix."""
+
+    @pytest.fixture(scope="class")
+    def m_features(self):
+        return pd.read_csv("artifacts/features_men.csv")
+
+    @pytest.fixture(scope="class")
+    def w_features(self):
+        return pd.read_csv("artifacts/features_women.csv")
+
+    def test_feature_count(self, m_features):
+        """Feature matrix should have 47 _diff columns (38 old + 9 Barttorvik)."""
+        diff_cols = [c for c in m_features.columns if c.endswith("_diff")]
+        assert len(diff_cols) == 47
+
+    def test_barttorvik_diff_cols_present(self, m_features):
+        """All 9 Barttorvik _diff columns should exist."""
+        expected = [f"{f}_diff" for f in BARTTORVIK_FEATURES]
+        actual = [c for c in m_features.columns if c.endswith("_diff")]
+        for col in expected:
+            assert col in actual, f"{col} missing from feature matrix"
+
+    def test_row_count_unchanged(self, m_features, w_features):
+        """Row counts should match pre-Barttorvik values."""
+        assert len(m_features) == 2585
+        assert len(w_features) == 1717
+
+    def test_nan_only_in_uncovered_seasons_m(self, m_features):
+        """Men's Barttorvik NaN should only be in pre-2008 seasons."""
+        bt_col = "barthag_diff"
+        covered = m_features[m_features["Season"] >= 2008]
+        uncovered = m_features[m_features["Season"] < 2008]
+        assert covered[bt_col].isna().sum() == 0
+        assert uncovered[bt_col].isna().all()
+
+    def test_nan_only_in_uncovered_seasons_w(self, w_features):
+        """Women's Barttorvik NaN should only be in pre-2021 seasons."""
+        bt_col = "barthag_diff"
+        covered = w_features[w_features["Season"] >= 2021]
+        uncovered = w_features[w_features["Season"] < 2021]
+        assert covered[bt_col].isna().sum() == 0
+        assert uncovered[bt_col].isna().all()
+
+    def test_barthag_diff_positive_correlation(self, m_features):
+        """barthag_diff should positively correlate with target."""
+        df = m_features.dropna(subset=["barthag_diff"])
+        corr = df["barthag_diff"].corr(df["target"])
+        assert corr > 0.3, f"barthag_diff correlation {corr} too low"
+
+    def test_wab_diff_positive_correlation(self, m_features):
+        """wab_diff should positively correlate with target."""
+        df = m_features.dropna(subset=["wab_diff"])
+        corr = df["wab_diff"].corr(df["target"])
+        assert corr > 0.3, f"wab_diff correlation {corr} too low"
+
+    def test_adjde_diff_negative_correlation(self, m_features):
+        """adjde_diff should negatively correlate (higher = worse defense)."""
+        df = m_features.dropna(subset=["adjde_diff"])
+        corr = df["adjde_diff"].corr(df["target"])
+        assert corr < -0.3, f"adjde_diff correlation {corr} should be negative"
+
+    def test_existing_features_not_corrupted(self):
+        """Old features should exactly match pre-Barttorvik backup."""
+        old = pd.read_csv("artifacts/features_men_pre_barttorvik.csv")
+        new = pd.read_csv("artifacts/features_men.csv")
+        for col in ["win_pct_diff", "elo_diff", "seed_num_diff", "off_eff_diff"]:
+            assert np.allclose(old[col].values, new[col].values, equal_nan=True), (
+                f"{col} values changed after Barttorvik integration"
+            )

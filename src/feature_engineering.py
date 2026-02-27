@@ -16,6 +16,7 @@ import pandas as pd
 
 from src import config
 from src import data_loader as dl
+from src.barttorvik import load_barttorvik_ratings, BARTTORVIK_FEATURES
 from src.elo import compute_elo_ratings, load_ratings, ELO_INIT
 from src.massey import get_season_system_index
 
@@ -455,6 +456,18 @@ class SeasonFeatureCache:
         if gender == 'M':
             self.coach_exp = compute_coach_exp_bulk(season)
 
+        # Barttorvik ratings (M: 2008+, W: 2021+)
+        self.barttorvik: dict[int, dict[str, float]] = {}
+        try:
+            bt = load_barttorvik_ratings(gender)
+            bt_season = bt[bt['Season'] == season]
+            for _, row in bt_season.iterrows():
+                self.barttorvik[int(row['TeamID'])] = {
+                    col: float(row[col]) for col in BARTTORVIK_FEATURES
+                }
+        except Exception:
+            pass  # No Barttorvik data for this season/gender — features will be NaN
+
     def get_team_features(self, team_id: int) -> dict[str, float]:
         """Get all features for a single team.
 
@@ -504,6 +517,11 @@ class SeasonFeatureCache:
 
         # Coach exp
         feats['coach_tourney_exp'] = float(self.coach_exp.get(team_id, 0.0))
+
+        # Barttorvik
+        bt = self.barttorvik.get(team_id, {})
+        for col in BARTTORVIK_FEATURES:
+            feats[col] = float(bt.get(col, np.nan))
 
         return feats
 
