@@ -96,10 +96,11 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5 — Hyperparameter Tuning (IN PROGRESS)
-<!-- Tuning complete. Bug fixed: ensemble CV now uses tuned params. -->
-<!-- Next: run scripts/generate_tuned_submission.py to get final tuned scores + submissions -->
-<!-- Then: update Brier scores table, commit, and close Phase 5 -->
+### 🔵 Current Phase: Phase 5 — Complete. Next: Barttorvik Feature Integration
+<!-- Tuning done. Pipeline fixed. Submissions generated. Kaggle Stage 1: 0.004. -->
+<!-- Next session: integrate Barttorvik data (data/barttorvik/, 2008-2026, 19 files) -->
+<!-- Match team names via MTeamSpellings.csv, add adjoe/adjde/barthag/adjt/WAB/elite.SOS -->
+<!-- Retrain + retune with expanded features, generate improved submission -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
@@ -137,6 +138,7 @@ Two types of skills:
 - BUG FIX: `run_all_models_cv()` was missing `model_params` kwarg — ensemble weight optimization was using default (untuned) model predictions. Fixed by adding `model_params` arg; new `scripts/generate_tuned_submission.py` loads tuned params and re-runs everything properly.
 - DECISION: First EOA run M-XGBoost (Brier 0.1826, max_depth=9) beat second run (0.1854, max_depth=4). Manually inserted first run's params into tuned_params.json.
 - TUNING RESULT: Weight optimization 3-way comparison — EOA lost both (M: 0.1802, W: 0.1266). Ax won M (0.1799), scipy won W (0.1263). All within 0.0003. Weight blending is smooth/low-dim, favors BO/Nelder-Mead over population search. EOA's strength is rugged HP tuning, not weight mixing.
+- DATA: Barttorvik ratings downloaded (2008-2026, 19 files in data/barttorvik/). 365 teams for 2026. Key new features: adjoe, adjde, barthag, adjt (tempo), WAB, elite.SOS, Qual.O/D/Barthag. Men's only — need MTeamSpellings.csv to match team names to TeamIDs.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
