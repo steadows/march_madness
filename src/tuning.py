@@ -157,6 +157,7 @@ def evaluate_params(
             metric_dict=metric_dict,
             run_name=f'trial_{trial_idx:03d}',
         )
+        writer.flush()
 
     return result
 

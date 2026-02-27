@@ -164,6 +164,7 @@ def tune_ensemble_weights_ax(
                 metric_dict={'brier': brier},
                 run_name=f'trial_{trial_idx:03d}',
             )
+            writer.flush()
 
     if writer:
         writer.close()

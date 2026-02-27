@@ -151,6 +151,7 @@ def tune_ensemble_weights_eoa(
                 metric_dict={'brier': brier},
                 run_name=f'trial_{trial_counter[0]:03d}',
             )
+            writer.flush()
         trial_counter[0] += 1
         return brier
 

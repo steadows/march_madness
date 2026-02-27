@@ -96,10 +96,11 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5b — Barttorvik Integration Complete
-<!-- Steps 1-7 done. Kaggle 0.00338 (new best). Key insight: don't re-optimize weights, old ones generalize better. -->
-<!-- 47 features (38 original + 9 Barttorvik). Best submission: ensemble_barttorvik_oldweights_v1.csv -->
-<!-- Next: consider HP retuning with new features, or other external data sources -->
+### 🔵 Current Phase: Phase 5b — Barttorvik HP Retuning Complete
+<!-- BT v2: retuned HPs with 47-feature set, new weights. Kaggle 0.00332 (new best). -->
+<!-- Best submission: ensemble_barttorvik_v2_newweights_stage1.csv -->
+<!-- Key insight: weights generalize when HPs+weights tuned end-to-end on same feature set. -->
+<!-- Next: consider additional external data, feature engineering, or stacking -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
@@ -118,7 +119,9 @@ Two types of skills:
 | Weighted Ensemble (tuned, scipy weights) | — | **0.1263** | 5 folds (2020-2024) | **BEST W** — scipy won weights (tied Ax 0.1263, EOA 0.1266) |
 | Kaggle Stage 1 (pre-BT) | — | — | Leaderboard | 0.00396 — ensemble_tuned_v1.csv |
 | Kaggle Stage 1 (BT, new weights) | — | — | Leaderboard | 0.00853 — ensemble_barttorvik_v1.csv (weight reopt overfit) |
-| **Kaggle Stage 1 (BT, old weights)** | — | — | Leaderboard | **0.00338** — ensemble_barttorvik_oldweights_v1.csv **NEW BEST** |
+| Kaggle Stage 1 (BT, old weights) | — | — | Leaderboard | 0.00338 — ensemble_barttorvik_oldweights_v1.csv |
+| Kaggle Stage 1 (BT v2, old weights) | — | — | Leaderboard | 0.00336 — ensemble_barttorvik_v2_oldweights_stage1.csv |
+| **Kaggle Stage 1 (BT v2, new weights)** | — | — | Leaderboard | **0.00332** — ensemble_barttorvik_v2_newweights_stage1.csv **NEW BEST** |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
@@ -146,7 +149,12 @@ Two types of skills:
 - DECISION: All 9 Barttorvik features passed through as differentials — no feature selection yet. GBMs handle irrelevant features via tree splits. Prune later if needed based on feature importance after retraining.
 - DECISION: Retrain with existing tuned HPs first (isolate feature effect), then optionally retune HPs. Script: `scripts/generate_barttorvik_submission.py` — reads `tuned_params_pre_barttorvik.json`, writes to new `*_barttorvik*` paths only. Nothing overwritten.
 - RESULT: Barttorvik features + old weights = Kaggle **0.00338** (new best, was 0.00396). Barttorvik features + re-optimized weights = 0.00853 (regression). Weight re-optimization on 5-fold OOF overfit — LightGBM jumped to 68% based on CV but didn't generalize. Old diversified weights (XGB 38%, LGBM 34%, CatBoost 28%) are more robust.
-- DECISION: Do NOT re-optimize ensemble weights after adding features. The old pre-Barttorvik weights generalize better. Only retune weights with more data or a different strategy (e.g., nested CV).
+- DECISION: Re-optimizing weights IS safe when HPs and weights are tuned end-to-end on the same feature set. The previous regression (0.00853) was caused by mismatched HPs (old) + features (new BT) + re-optimized weights. When all three are consistent, new weights generalize (0.00332 new best).
+- RESULT: BT v2 (new HPs + new weights) = Kaggle 0.00332 (best). BT v2 (new HPs + old weights) = 0.00336. New HPs alone improved both variants vs old HPs.
+- OBSERVATION: Women's HP retuning contributed little — all W models converged to depth=3 (shallow trees). Women dataset is the constraint (1717 rows vs 2585 M), not model complexity. BT features drove W improvement, not HP search.
+- BUG FIX: TensorBoard trials not visible mid-run — `SummaryWriter` buffers writes until `close()`. Fixed by adding `writer.flush()` after every `add_hparams()` call in `tuning.py`, `tuning_eoa.py`, `tuning_ax.py`.
+- SCRIPT: `scripts/run_tuning_barttorvik.py` — full HP + weight tuning with BT features. Writes to `*_barttorvik_v2*` paths only. Checkpoints to `artifacts/tuning_barttorvik_v2_checkpoint.json` after each model.
+- SCRIPT: `scripts/generate_barttorvik_v2_submission.py` — lean submission generator (no CV re-run). Loads `tuned_params_barttorvik_v2.json`, trains on all data, generates both new-weights and old-weights variants in one run.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
