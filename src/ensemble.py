@@ -9,6 +9,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 from src.calibration import clip_predictions
 from src.cv import expanding_window_cv, evaluate_brier
@@ -262,3 +265,102 @@ def log_ensemble_results(
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(report + '\n')
+
+
+# ---------------------------------------------------------------------------
+# Stacking meta-learner
+# ---------------------------------------------------------------------------
+
+def build_meta_features(
+    cv_results: dict,
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    extra_meta_cols: list[str] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build meta-feature matrix from OOF predictions for stacking.
+
+    Args:
+        cv_results: Output of run_all_models_cv().
+        df: Original feature DataFrame (needed for extra_meta_cols).
+        feature_cols: All _diff feature column names.
+        extra_meta_cols: Optional raw features to append (e.g. ['seed_num_diff']).
+
+    Returns:
+        (X_meta, y_meta): meta-feature matrix and targets.
+    """
+    model_names = ['logistic', 'ridge', 'xgboost', 'lightgbm', 'catboost']
+    oof_cols = [cv_results[name]['oof_preds'] for name in model_names]
+    X_meta = np.column_stack(oof_cols)
+    y_meta = cv_results[model_names[0]]['oof_targets']
+
+    if extra_meta_cols:
+        # OOF predictions are concatenated across expanding-window folds
+        # (val seasons 2020-2024), so we need the same rows from df.
+        folds = expanding_window_cv(df, min_train_end=2019)
+        val_indices = np.concatenate([val_idx for _, val_idx in folds])
+        extra = df.loc[val_indices, extra_meta_cols].fillna(0).values
+        X_meta = np.column_stack([X_meta, extra])
+
+    return X_meta, y_meta
+
+
+def train_meta_learner(
+    X_meta: np.ndarray,
+    y_meta: np.ndarray,
+    calibrate: bool = True,
+) -> dict:
+    """Train a logistic regression meta-learner on OOF base-model predictions.
+
+    Args:
+        X_meta: Meta-feature matrix (N, n_base_models + extras).
+        y_meta: Binary targets.
+        calibrate: Whether to fit isotonic calibration on residuals.
+
+    Returns:
+        Dict with 'scaler', 'model', and optionally 'calibrator'.
+    """
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_meta)
+
+    model = LogisticRegression(C=1.0, max_iter=1000, solver='lbfgs')
+    model.fit(X_scaled, y_meta)
+
+    meta = {'scaler': scaler, 'model': model, 'calibrator': None}
+
+    if calibrate:
+        raw_preds = model.predict_proba(X_scaled)[:, 1]
+        iso = IsotonicRegression(out_of_bounds='clip', y_min=0.05, y_max=0.95)
+        iso.fit(raw_preds, y_meta)
+        meta['calibrator'] = iso
+
+    return meta
+
+
+def meta_learner_predict(
+    meta: dict,
+    base_preds: dict[str, np.ndarray],
+    extra_features: np.ndarray | None = None,
+) -> np.ndarray:
+    """Generate final predictions through the stacking meta-learner.
+
+    Args:
+        meta: Output of train_meta_learner().
+        base_preds: {model_name: prediction_array} from base models.
+        extra_features: Optional extra columns (same order as training).
+
+    Returns:
+        Calibrated, clipped prediction array.
+    """
+    model_names = ['logistic', 'ridge', 'xgboost', 'lightgbm', 'catboost']
+    X_meta = np.column_stack([base_preds[name] for name in model_names])
+
+    if extra_features is not None:
+        X_meta = np.column_stack([X_meta, extra_features])
+
+    X_scaled = meta['scaler'].transform(X_meta)
+    preds = meta['model'].predict_proba(X_scaled)[:, 1]
+
+    if meta['calibrator'] is not None:
+        preds = meta['calibrator'].predict(preds)
+
+    return clip_predictions(preds)

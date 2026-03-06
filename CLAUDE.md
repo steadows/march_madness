@@ -96,11 +96,12 @@ Two types of skills:
 - [x] Phase 4: Ensemble Pipeline (LightGBM + CatBoost + Ridge + weighted ensemble)
 - [ ] Phase 5: Iteration & Improvement
 
-### 🔵 Current Phase: Phase 5b — Barttorvik HP Retuning Complete
-<!-- BT v2: retuned HPs with 47-feature set, new weights. Kaggle 0.00332 (new best). -->
-<!-- Best submission: ensemble_barttorvik_v2_newweights_stage1.csv -->
-<!-- Key insight: weights generalize when HPs+weights tuned end-to-end on same feature set. -->
-<!-- Next: consider additional external data, feature engineering, or stacking -->
+### 🔵 Current Phase: Phase 5c — Stacking Meta-Learner Complete
+<!-- Competition switched to Stage 2 (2026 only, 132133 rows). No leaderboard scores until tournament starts. -->
+<!-- Best Stage 2 submission: ensemble_stacked_v1_2026.csv (stacking meta-learner) -->
+<!-- OOF improvement: M -0.0168, W -0.0109 vs weighted ensemble -->
+<!-- Next: bracket simulator script (needs 2026 seeds from Selection Sunday March 15) -->
+<!-- Next: seed interaction features, KenPom data, or further iteration -->
 
 ### 📈 Best Brier Scores
 | Model | Men | Women | CV Folds | Notes |
@@ -121,7 +122,10 @@ Two types of skills:
 | Kaggle Stage 1 (BT, new weights) | — | — | Leaderboard | 0.00853 — ensemble_barttorvik_v1.csv (weight reopt overfit) |
 | Kaggle Stage 1 (BT, old weights) | — | — | Leaderboard | 0.00338 — ensemble_barttorvik_oldweights_v1.csv |
 | Kaggle Stage 1 (BT v2, old weights) | — | — | Leaderboard | 0.00336 — ensemble_barttorvik_v2_oldweights_stage1.csv |
-| **Kaggle Stage 1 (BT v2, new weights)** | — | — | Leaderboard | **0.00332** — ensemble_barttorvik_v2_newweights_stage1.csv **NEW BEST** |
+| **Kaggle Stage 1 (BT v2, new weights)** | — | — | Leaderboard | **0.00332** — ensemble_barttorvik_v2_newweights_stage1.csv **BEST Stage 1** |
+| Stacked meta-learner (OOF) | **0.1273** | **0.1115** | 5 folds concat | OOF eval (meta-learner trained on same data — mildly optimistic) |
+| Weighted ensemble (OOF, same run) | 0.1441 | 0.1224 | 5 folds concat | Baseline comparison for stacking delta |
+| **Kaggle Stage 2 (stacked)** | — | — | Leaderboard | **TBD** — ensemble_stacked_v1_2026.csv (scores after tournament starts) |
 
 ### 🔑 Key Decisions
 <!-- Log decisions so future sessions don't re-debate. Format: "DECISION: <what> — <why>" -->
@@ -155,6 +159,13 @@ Two types of skills:
 - BUG FIX: TensorBoard trials not visible mid-run — `SummaryWriter` buffers writes until `close()`. Fixed by adding `writer.flush()` after every `add_hparams()` call in `tuning.py`, `tuning_eoa.py`, `tuning_ax.py`.
 - SCRIPT: `scripts/run_tuning_barttorvik.py` — full HP + weight tuning with BT features. Writes to `*_barttorvik_v2*` paths only. Checkpoints to `artifacts/tuning_barttorvik_v2_checkpoint.json` after each model.
 - SCRIPT: `scripts/generate_barttorvik_v2_submission.py` — lean submission generator (no CV re-run). Loads `tuned_params_barttorvik_v2.json`, trains on all data, generates both new-weights and old-weights variants in one run.
+- DECISION: Stacking meta-learner replaces fixed weighted ensemble. Logistic regression on 5 base model OOF preds + seed_num_diff. Isotonic calibration on top. OOF Brier improved M by -0.0168, W by -0.0109 vs weighted ensemble.
+- RESULT: Meta-learner M coefficients: XGB 0.93, CB 0.95, LGBM 0.65, logistic -0.92 (contrarian), ridge 0.25, seed_num_diff 0.19. Logistic baseline used as contrarian signal, not zeroed out.
+- RESULT: Meta-learner W coefficients: CB 0.99, LGBM 0.74, XGB 0.44, logistic -0.59 (contrarian), ridge -0.06, seed_num_diff -0.73.
+- CAVEAT: Stacked OOF Brier (M=0.1273, W=0.1115) is evaluated on meta-learner's training data — mildly optimistic. But 6 features + L2 regularization on 334 samples means minimal overfitting. Kaggle score will be the true test.
+- COMPETITION: Stage 2 active as of March 6, 2026. Submissions must be 132,133 rows (2026 only). Leaderboard shows 0.0 until tournament games are played and Kaggle rescores.
+- SCRIPT: `scripts/generate_stacked_submission.py` — full pipeline: CV -> OOF -> train meta-learner -> train base models on all data -> generate stacked + weighted submissions.
+- TODO: Build bracket simulator script. Needs 2026 seeds (Selection Sunday March 15). Takes our submission probabilities, simulates tournament round-by-round, outputs bracket picks for CBS/ESPN.
 
 ### ⚠️ Known Issues / Blockers
 <!-- Format: "ISSUE: <what> — SEVERITY: high/medium/low — STATUS: open/resolved" -->
@@ -203,6 +214,8 @@ COMPETITION.md           — Full competition details, data dictionary, methods 
 skills.sh                — Skill index and loader (bash skills.sh <name>)
 .claude/skills/*.md      — Individual skill files
 src/barttorvik.py        — Barttorvik data loading, name mapping, column alignment fix
+src/ensemble.py          — CV pipeline, weighted ensemble, AND stacking meta-learner (build_meta_features, train_meta_learner, meta_learner_predict)
+scripts/generate_stacked_submission.py — Full stacking pipeline: CV -> meta-learner -> submission (CURRENT BEST)
 scripts/generate_barttorvik_submission.py — Retrain + submit with Barttorvik features (safe, new output paths)
 ```
 
